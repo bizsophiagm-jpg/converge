@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum EntityType {
+  PERSON
+  ORG
+  LOCATION
+  EVENT
+  IDENTIFIER
+}
+
+model Entity {
+  id          String     @id @default(cuid())
+  type        EntityType
+  name        String
+  aliases     String     @default("") // comma-separated for MVP
+  notes       String     @default("")
+  photoUrl    String     @default("")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  tags        TagOnEntity[]
+  evidence    Evidence[]
+  relFrom     Relationship[] @relation("RelFrom")
+  relTo       Relationship[] @relation("RelTo")
+
+  eventDate   String     @default("")  // ISO or freeform
+  eventEnd    String     @default("")
+  locationRef String     @default("")  // location name/id freeform for MVP
+}
+
+model Relationship {
+  id        String   @id @default(cuid())
+  fromId    String
+  toId      String
+  type      String   // e.g. "WORKED_AT", "DONATED_TO", "FAMILY"
+  startDate String   @default("") // ISO or YYYY or freeform
+  endDate   String   @default("")
+  strength  Int      @default(50) // 0-100
+  notes     String   @default("")
+  createdAt DateTime @default(now())
+
+  from      Entity   @relation("RelFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to        Entity   @relation("RelTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@index([fromId])
+  @@index([toId])
+  @@index([type])
+}
+
+model Tag {
+  id    String @id @default(cuid())
+  name  String @unique
+  kind  String @default("GENERAL") // e.g. RISK, ROLE, FINANCE, BEHAVIOR
+}
+
+model TagOnEntity {
+  id       String @id @default(cuid())
+  entityId String
+  tagId    String
+  value    String @default("") // optional structured value
+  createdAt DateTime @default(now())
+
+  entity   Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([entityId, tagId])
+}
+
+model Evidence {
+  id        String   @id @default(cuid())
+  entityId  String
+  kind      String   @default("NOTE") // NOTE, LINK, FILE (later)
+  content   String   // text or URL
+  createdAt DateTime @default(now())
+
+  entity    Entity   @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  @@index([entityId])
+}
